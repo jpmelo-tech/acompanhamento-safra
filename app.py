@@ -52,29 +52,25 @@ tema = st.sidebar.radio("Tema Visual", ["Claro", "Dark"])
 inst_sel = st.sidebar.multiselect("Instituições", sorted(df['Instituição Financeira'].unique()))
 safra_sel = st.sidebar.multiselect("Safras", anos_safra, default=[anos_safra[-1]])
 
-# --- CSS Dinâmico com Centralização ---
+# --- CSS Dinâmico Estabilizado ---
 if tema == "Dark":
-    bg_color, text_color, card_color, separator, plotly_template = "#0E1117", "#FFFFFF", "#262730", "white", "plotly_dark"
+    bg_color, text_color, card_color = "#0E1117", "#FFFFFF", "#262730"
+    plotly_template = "plotly_dark"
 else:
-    bg_color, text_color, card_color, separator, plotly_template = "#FFFFFF", "#000000", "#F0F2F6", "black", "plotly_white"
+    bg_color, text_color, card_color = "#FFFFFF", "#000000", "#F0F2F6"
+    plotly_template = "plotly_white"
 
+# Removido seletor de centralização agressiva que causava erro de 'removeChild'
 st.markdown(f"""
     <style>
     .stApp {{ background-color: {bg_color}; color: {text_color}; }}
     [data-testid="stSidebar"] {{ background-color: {card_color}; }}
     h1, h2, h3, h5, p {{ color: {text_color} !important; }}
-    
-    /* Centralização dos cabeçalhos do Dataframe */
-    [data-testid="stHeaderRowCellContents"] {{
-        justify-content: center !important;
-        text-align: center !important;
-        font-weight: bold !important;
-    }}
     </style>
     """, unsafe_allow_html=True)
 
 # --- Cabeçalho Principal ---
-st.title("🌱 Inteligência do Crédito Rural")
+st.title("🌱 Intelligence Crédito Rural")
 st.markdown("##### Fonte: Matriz de Dados do Crédito Rural do Banco Central do Brasil")
 
 # --- Lógica de Meses ---
@@ -93,10 +89,9 @@ mes_fim = [k for k, v in nomes_meses.items() if v == mes_fim_nome][0]
 idx_i, idx_f = ordem_safra.index(mes_inicio), ordem_safra.index(mes_fim)
 meses_validos = ordem_safra[idx_i : idx_f + 1] if idx_i <= idx_f else ordem_safra[idx_i:] + ordem_safra[:idx_f + 1]
 
-# Texto informativo do período
 periodo_texto = f"Período selecionado: **{mes_inicio_nome}** até **{mes_fim_nome}**"
 st.info(f"📅 {periodo_texto}")
-st.markdown("---")
+st.divider() # Usando o componente nativo em vez de markdown horizontal rule
 
 # --- Filtragem ---
 df_f = df[df['Mes_Emissao'].isin(meses_validos)].copy()
@@ -115,7 +110,7 @@ if not df_f.empty:
                        category_orders={"Mes_Emissao": ordem_safra},
                        labels={"Total_BI": "Volume (Bi R$)", "Mes_Emissao": "Mês", "Instituição Financeira": "Instituição"},
                        template=plotly_template)
-    st.plotly_chart(fig_line, use_container_width=True)
+    st.plotly_chart(fig_line, use_container_width=True, key="grafico_evolucao")
 
     # 2. Relatório Completo
     st.subheader("📋 Relatório Completo por Finalidade")
@@ -128,7 +123,8 @@ if not df_f.empty:
 
     df_final = pd.concat([rel_bi, rel_pct], axis=1).reset_index()
 
-    for safra in sorted(df_final['Ano Safra'].unique(), reverse=True):
+    # Loop com chaves únicas para evitar o erro NotFoundError de Node
+    for i, safra in enumerate(sorted(df_final['Ano Safra'].unique(), reverse=True)):
         st.markdown(f"### 🗓️ Safra {safra}")
         df_safra = df_final[df_final['Ano Safra'] == safra].sort_values(by='Total', ascending=False)
 
@@ -144,7 +140,14 @@ if not df_f.empty:
             col_configs[col] = st.column_config.NumberColumn(nome, format="R$ %.2f BI")
             col_configs[col + " (%)"] = st.column_config.NumberColumn(nome + " %", format="%.2f%%")
 
-        st.dataframe(df_safra, column_config=col_configs, use_container_width=True, hide_index=True)
-        st.markdown(f"<hr style='border: 1px solid {separator};'>", unsafe_allow_html=True)
+        # A KEY única aqui é fundamental para o Streamlit Cloud não se perder na renderização
+        st.dataframe(
+            df_safra, 
+            column_config=col_configs, 
+            use_container_width=True, 
+            hide_index=True,
+            key=f"df_safra_{safra}_{i}"
+        )
+        st.divider()
 else:
     st.warning("Sem dados para o intervalo selecionado.")
