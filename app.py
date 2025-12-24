@@ -92,7 +92,7 @@ idx_i, idx_f = ordem_safra.index(mes_inicio), ordem_safra.index(mes_fim)
 meses_validos = ordem_safra[idx_i : idx_f + 1] if idx_i <= idx_f else ordem_safra[idx_i:] + ordem_safra[:idx_f + 1]
 
 st.info(f"📅 Safra: **{mes_inicio_nome}** até **{mes_fim_nome}**")
-st.divider()
+st.markdown("---")
 
 # --- Filtros de Dados ---
 df_f = df[df['Mes_Emissao'].isin(meses_validos)].copy()
@@ -101,7 +101,7 @@ if inst_sel: df_f = df_f[df_f['Instituição Financeira'].isin(inst_sel)]
 
 # --- Visualizações ---
 if not df_f.empty:
-    # 1. Gráfico de Evolução
+    # 1. Gráfico de Evolução (estrutura estável: um único componente)
     st.subheader("📈 Evolução Mensal")
     evol_data = (
         df_f.groupby(['Instituição Financeira', 'Ano Safra', 'Mes_Emissao'], observed=True)[valores_cols]
@@ -111,7 +111,6 @@ if not df_f.empty:
     )
     evol_data['Total_BI'] = evol_data['Total'] / 1e9
 
-    chart_key = f"chart_line_prod_{hash(str(safra_sel)+str(inst_sel)+str(mes_inicio_nome)+str(mes_fim_nome))}"
     fig_line = px.line(
         evol_data,
         x='Mes_Emissao',
@@ -122,32 +121,33 @@ if not df_f.empty:
         category_orders={"Mes_Emissao": ordem_safra},
         template=plotly_template
     )
-    st.plotly_chart(fig_line, use_container_width=True, key=chart_key)
+    st.plotly_chart(fig_line, use_container_width=True)
 
-    # 2. Relatório de Finalidade
+    st.markdown("---")
+
+    # 2. Relatório consolidado em uma única tabela (estrutura estável: um único componente)
     st.subheader("📋 Detalhamento por Safra")
     rel_bruto = df_f.groupby(['Ano Safra', 'Instituição Financeira'], observed=True)[valores_cols].sum()
     rel_bruto['Total'] = rel_bruto.sum(axis=1)
+
+    # Percentuais por safra
     rel_pct = (rel_bruto.div(rel_bruto.groupby(level=0).sum(), level=0) * 100)
     rel_pct.columns = [c + " (%)" for c in rel_pct.columns]
 
+    # Consolida em um único DataFrame
     df_final = pd.concat([rel_bruto / 1e9, rel_pct], axis=1).reset_index()
 
-    for i, safra in enumerate(sorted(df_final['Ano Safra'].unique(), reverse=True)):
-        st.markdown(f"#### 🗓️ Safra {safra}")
-        df_safra = df_final[df_final['Ano Safra'] == safra].sort_values(by='Total', ascending=False)
+    # Ordenação estável
+    df_final = df_final.sort_values(by=['Ano Safra', 'Total'], ascending=[False, False])
 
-        col_configs = {
-            "Ano Safra": None,
-            "Total": st.column_config.NumberColumn("Total", format="R$ %.2f BI"),
-            "Total (%)": st.column_config.ProgressColumn("MS (%)", format="%.2f%%", min_value=0, max_value=100)
-        }
+    col_configs = {
+        "Ano Safra": None,
+        "Total": st.column_config.NumberColumn("Total", format="R$ %.2f BI"),
+        "Total (%)": st.column_config.ProgressColumn("MS (%)", format="%.2f%%", min_value=0, max_value=100)
+    }
 
-        tbl_key = f"tbl_{safra}_{i}_{hash(str(df_safra.shape))}"
-        st.dataframe(df_safra, column_config=col_configs, use_container_width=True, hide_index=True, key=tbl_key)
+    st.dataframe(df_final, column_config=col_configs, use_container_width=True, hide_index=True)
 
-    st.divider()
+    st.markdown("---")
 else:
     st.warning("Nenhum dado encontrado para os filtros atuais.")
-
-
