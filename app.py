@@ -101,7 +101,7 @@ if inst_sel: df_f = df_f[df_f['Instituição Financeira'].isin(inst_sel)]
 
 # --- Visualizações ---
 if not df_f.empty:
-    # 1. Gráfico de Evolução (estrutura estável: um único componente)
+    # 1. Gráfico de Evolução
     st.subheader("📈 Evolução Mensal")
     evol_data = (
         df_f.groupby(['Instituição Financeira', 'Ano Safra', 'Mes_Emissao'], observed=True)[valores_cols]
@@ -125,20 +125,16 @@ if not df_f.empty:
 
     st.markdown("---")
 
-    # 2. Relatório consolidado em uma única tabela (estrutura estável: um único componente)
+    # 2. Relatório por Safra com Tabs (estrutura estável)
     st.subheader("📋 Detalhamento por Safra")
     rel_bruto = df_f.groupby(['Ano Safra', 'Instituição Financeira'], observed=True)[valores_cols].sum()
     rel_bruto['Total'] = rel_bruto.sum(axis=1)
-
-    # Percentuais por safra
     rel_pct = (rel_bruto.div(rel_bruto.groupby(level=0).sum(), level=0) * 100)
     rel_pct.columns = [c + " (%)" for c in rel_pct.columns]
-
-    # Consolida em um único DataFrame
     df_final = pd.concat([rel_bruto / 1e9, rel_pct], axis=1).reset_index()
 
-    # Ordenação estável
-    df_final = df_final.sort_values(by=['Ano Safra', 'Total'], ascending=[False, False])
+    safra_list = sorted(df_final['Ano Safra'].unique(), reverse=True)
+    tabs = st.tabs([f"Safra {s}" for s in safra_list])
 
     col_configs = {
         "Ano Safra": None,
@@ -146,7 +142,10 @@ if not df_f.empty:
         "Total (%)": st.column_config.ProgressColumn("MS (%)", format="%.2f%%", min_value=0, max_value=100)
     }
 
-    st.dataframe(df_final, column_config=col_configs, use_container_width=True, hide_index=True)
+    for tab, safra in zip(tabs, safra_list):
+        with tab:
+            df_safra = df_final[df_final['Ano Safra'] == safra].sort_values(by='Total', ascending=False)
+            st.dataframe(df_safra, column_config=col_configs, use_container_width=True, hide_index=True)
 
     st.markdown("---")
 else:
