@@ -29,10 +29,10 @@ def load_data():
                 df_temp = pd.read_parquet(arq)
                 lista_dfs.append(df_temp)
             except Exception as e:
-                st.warning(f"Aviso: Não foi possível ler {arq}. Erro: {e}")
+                st.warning(f"Aviso: Não foi possível ler {arq}. Erro: {e}", key=f"warn_{arq}")
 
     if not lista_dfs:
-        st.error("Nenhum dos arquivos especificados foi encontrado no repositório.")
+        st.error("Nenhum dos arquivos especificados foi encontrado no repositório.", key="error_no_files")
         return pd.DataFrame()
 
     df = pd.concat(lista_dfs, ignore_index=True)
@@ -74,7 +74,7 @@ st.markdown(f"""
 
 # --- Cabeçalho ---
 st.title("🌱 Inteligência do Crédito Rural")
-st.markdown("##### Fonte: Banco Central do Brasil")
+st.markdown("##### Fonte: Banco Central do Brasil", key="md_fonte")
 
 # --- Lógica de Meses da Safra ---
 ordem_safra = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
@@ -91,8 +91,8 @@ mes_fim = [k for k, v in nomes_meses.items() if v == mes_fim_nome][0]
 idx_i, idx_f = ordem_safra.index(mes_inicio), ordem_safra.index(mes_fim)
 meses_validos = ordem_safra[idx_i : idx_f + 1] if idx_i <= idx_f else ordem_safra[idx_i:] + ordem_safra[:idx_f + 1]
 
-st.info(f"📅 Safra: **{mes_inicio_nome}** até **{mes_fim_nome}**")
-st.divider()
+st.info(f"📅 Safra: **{mes_inicio_nome}** até **{mes_fim_nome}**", key="info_safra")
+st.divider(key="divider_top")
 
 # --- Filtros de Dados ---
 df_f = df[df['Mes_Emissao'].isin(meses_validos)].copy()
@@ -134,7 +134,7 @@ if not df_f.empty:
     df_final = pd.concat([rel_bruto / 1e9, rel_pct], axis=1).reset_index()
 
     for i, safra in enumerate(sorted(df_final['Ano Safra'].unique(), reverse=True)):
-        st.markdown(f"#### 🗓️ Safra {safra}")
+        st.markdown(f"#### 🗓️ Safra {safra}", key=f"md_safra_{safra}_{i}")
         df_safra = df_final[df_final['Ano Safra'] == safra].sort_values(by='Total', ascending=False)
 
         col_configs = {
@@ -146,7 +146,6 @@ if not df_f.empty:
         tbl_key = f"tbl_{safra}_{i}_{hash(str(df_safra.shape))}"
         st.dataframe(df_safra, column_config=col_configs, use_container_width=True, hide_index=True, key=tbl_key)
 
-    # divider fora do loop
-    st.divider()
+    st.divider(key="divider_final")
 else:
-    st.warning("Nenhum dado encontrado para os filtros atuais.")
+    st.warning("Nenhum dado encontrado para os filtros atuais.", key="warn_no_data")
