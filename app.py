@@ -74,7 +74,7 @@ st.markdown(f"""
 
 # --- Cabeçalho ---
 st.title("🌱 Inteligência do Crédito Rural")
-st.markdown("##### Fonte: Banco Central do Brasil", key="md_fonte")
+st.markdown("##### Fonte: Banco Central do Brasil")
 
 # --- Lógica de Meses da Safra ---
 ordem_safra = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
@@ -149,3 +149,4 @@ if not df_f.empty:
     st.divider(key="divider_final")
 else:
     st.warning("Nenhum dado encontrado para os filtros atuais.", key="warn_no_data")
+
