@@ -8,7 +8,6 @@ st.set_page_config(page_title="Dashboard Crédito Rural", page_icon="🌱", layo
 
 @st.cache_data
 def load_data():
-    # Lista explícita dos arquivos para garantir previsibilidade total do sistema de arquivos
     arquivos = [
         "matriz_de_dados_credito_rural_2015-2016.parquet",
         "matriz_de_dados_credito_rural_2016-2017.parquet",
@@ -24,11 +23,9 @@ def load_data():
     ]
     
     lista_dfs = []
-    
     for arq in arquivos:
         if os.path.exists(arq):
             try:
-                # Leitura direta de cada arquivo
                 df_temp = pd.read_parquet(arq)
                 lista_dfs.append(df_temp)
             except Exception as e:
@@ -38,22 +35,16 @@ def load_data():
         st.error("Nenhum dos arquivos especificados foi encontrado no repositório.")
         return pd.DataFrame()
 
-    # Concatenação final
     df = pd.concat(lista_dfs, ignore_index=True)
-    
-    # Renomeação e Tipagem (Essencial para performance e evitar erros de renderização)
     df = df.rename(columns={
         'Classificacao_IF': 'Instituição Financeira',
         'Ano_Safra': 'Ano Safra'
     })
-    
     df[['UF', 'Instituição Financeira', 'Ano Safra']] = df[['UF', 'Instituição Financeira', 'Ano Safra']].astype('category')
     df[['Mes_Emissao', 'Ano_Emissao']] = df[['Mes_Emissao', 'Ano_Emissao']].astype(int)
-    
     return df
 
 df = load_data()
-
 if df.empty:
     st.stop()
 
@@ -112,23 +103,34 @@ if inst_sel: df_f = df_f[df_f['Instituição Financeira'].isin(inst_sel)]
 if not df_f.empty:
     # 1. Gráfico de Evolução
     st.subheader("📈 Evolução Mensal")
-    evol_data = df_f.groupby(['Instituição Financeira', 'Ano Safra', 'Mes_Emissao'], observed=True)[valores_cols].sum().sum(axis=1).reset_index(name='Total')
+    evol_data = (
+        df_f.groupby(['Instituição Financeira', 'Ano Safra', 'Mes_Emissao'], observed=True)[valores_cols]
+        .sum()
+        .sum(axis=1)
+        .reset_index(name='Total')
+    )
     evol_data['Total_BI'] = evol_data['Total'] / 1e9
 
-    fig_line = px.line(evol_data, x='Mes_Emissao', y='Total_BI', color='Instituição Financeira', 
-                       facet_col='Ano Safra', markers=True,
-                       category_orders={"Mes_Emissao": ordem_safra},
-                       template=plotly_template)
-    st.plotly_chart(fig_line, use_container_width=True, key="chart_line_prod")
+    chart_key = f"chart_line_prod_{hash(str(safra_sel)+str(inst_sel)+str(mes_inicio_nome)+str(mes_fim_nome))}"
+    fig_line = px.line(
+        evol_data,
+        x='Mes_Emissao',
+        y='Total_BI',
+        color='Instituição Financeira',
+        facet_col='Ano Safra',
+        markers=True,
+        category_orders={"Mes_Emissao": ordem_safra},
+        template=plotly_template
+    )
+    st.plotly_chart(fig_line, use_container_width=True, key=chart_key)
 
     # 2. Relatório de Finalidade
     st.subheader("📋 Detalhamento por Safra")
-    
     rel_bruto = df_f.groupby(['Ano Safra', 'Instituição Financeira'], observed=True)[valores_cols].sum()
     rel_bruto['Total'] = rel_bruto.sum(axis=1)
     rel_pct = (rel_bruto.div(rel_bruto.groupby(level=0).sum(), level=0) * 100)
     rel_pct.columns = [c + " (%)" for c in rel_pct.columns]
-    
+
     df_final = pd.concat([rel_bruto / 1e9, rel_pct], axis=1).reset_index()
 
     for i, safra in enumerate(sorted(df_final['Ano Safra'].unique(), reverse=True)):
@@ -140,9 +142,11 @@ if not df_f.empty:
             "Total": st.column_config.NumberColumn("Total", format="R$ %.2f BI"),
             "Total (%)": st.column_config.ProgressColumn("MS (%)", format="%.2f%%", min_value=0, max_value=100)
         }
-        
-        # O uso de chaves fixas e strings limpas previne erros de DOM no Streamlit Cloud
-        st.dataframe(df_safra, column_config=col_configs, use_container_width=True, hide_index=True, key=f"tbl_{safra}_{i}")
-        st.divider()
+
+        tbl_key = f"tbl_{safra}_{i}_{hash(str(df_safra.shape))}"
+        st.dataframe(df_safra, column_config=col_configs, use_container_width=True, hide_index=True, key=tbl_key)
+
+    # divider fora do loop
+    st.divider()
 else:
     st.warning("Nenhum dado encontrado para os filtros atuais.")
