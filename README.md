@@ -1,4 +1,4 @@
-# 🌱 Intelligence Crédito Rural
+# 🌱 InteligÊncia do Crédito Rural
 
 Este dashboard interativo foi desenvolvido em Python utilizando a biblioteca **Streamlit** para visualizar e analisar dados da **Matriz de Dados do Crédito Rural do Banco Central do Brasil**.
 
