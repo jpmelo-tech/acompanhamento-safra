@@ -2,52 +2,51 @@ import streamlit as st
 import pandas as pd
 import os
 
+# --- Configuração da Página ---
 st.set_page_config(page_title="Dashboard Crédito Rural", page_icon="🌱", layout="wide")
 
+# --- Carregamento dos Dados ---
 @st.cache_data
 def load_data():
     arquivos = [
-        "matriz_de_dados_credito_rural_2015-2016.parquet",
-        "matriz_de_dados_credito_rural_2016-2017.parquet",
-        "matriz_de_dados_credito_rural_2017-2018.parquet",
-        "matriz_de_dados_credito_rural_2018-2019.parquet",
-        "matriz_de_dados_credito_rural_2019-2020.parquet",
-        "matriz_de_dados_credito_rural_2020-2021.parquet",
-        "matriz_de_dados_credito_rural_2021-2022.parquet",
-        "matriz_de_dados_credito_rural_2022-2023.parquet",
-        "matriz_de_dados_credito_rural_2023-2024.parquet",
-        "matriz_de_dados_credito_rural_2024-2025.parquet",
-        "matriz_de_dados_credito_rural_2025-2026.parquet"
+        f"matriz_de_dados_credito_rural_{ano}.parquet"
+        for ano in [
+            "2015-2016","2016-2017","2017-2018","2018-2019","2019-2020",
+            "2020-2021","2021-2022","2022-2023","2023-2024","2024-2025","2025-2026"
+        ]
     ]
     
     lista_dfs = []
-    erros = []
     for arq in arquivos:
         if os.path.exists(arq):
             try:
-                df_temp = pd.read_parquet(arq)
-                lista_dfs.append(df_temp)
+                lista_dfs.append(pd.read_parquet(arq))
             except Exception as e:
-                erros.append(f"Não foi possível ler {arq}. Erro: {e}")
+                # Apenas registra o erro, sem renderizar nada
+                print(f"Erro ao ler {arq}: {e}")
 
     if not lista_dfs:
-        return pd.DataFrame(), erros
+        return pd.DataFrame()
 
     df = pd.concat(lista_dfs, ignore_index=True)
     df = df.rename(columns={'Classificacao_IF': 'Instituição Financeira', 'Ano_Safra': 'Ano Safra'})
-    df[['UF', 'Instituição Financeira', 'Ano Safra']] = df[['UF', 'Instituição Financeira', 'Ano Safra']].astype('category')
-    df[['Mes_Emissao', 'Ano_Emissao']] = df[['Mes_Emissao', 'Ano_Emissao']].astype(int)
-    return df, erros
+    
+    # Tipagem
+    for col in ['UF', 'Instituição Financeira', 'Ano Safra']:
+        if col in df.columns:
+            df[col] = df[col].astype('category')
+    for col in ['Mes_Emissao', 'Ano_Emissao']:
+        if col in df.columns:
+            df[col] = df[col].astype(int)
+    
+    return df
 
-# --- Uso da função ---
-df, erros = load_data()
-
-# Mensagens de interface FORA da função cacheada
-for msg in erros:
-    st.warning(msg)
+# --- Uso ---
+df = load_data()
 
 if df.empty:
-    st.error("Nenhum dos arquivos especificados foi encontrado.")
+    st.error("Nenhum arquivo foi encontrado ou pôde ser lido.")
     st.stop()
 
+st.success("Dados carregados com sucesso!")
 st.write(df.head())
