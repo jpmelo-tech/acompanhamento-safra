@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 st.set_page_config(page_title="Dashboard Crédito Rural", page_icon="🌱", layout="wide")
 
@@ -13,30 +14,30 @@ def load_data():
             "2020-2021","2021-2022","2022-2023","2023-2024","2024-2025","2025-2026"
         ]
     ]
-    
     lista_dfs = []
     for arq in arquivos:
         url = base_url + arq
         try:
-            df_temp = pd.read_parquet(url)
-            lista_dfs.append(df_temp)
+            lista_dfs.append(pd.read_parquet(url))
         except Exception as e:
-            st.warning(f"Erro ao ler {arq}: {e}")
-
+            # Apenas log, sem st.warning
+            print(f"Erro ao ler {arq}: {e}")
     if not lista_dfs:
         return pd.DataFrame()
-
     df = pd.concat(lista_dfs, ignore_index=True)
-    df = df.rename(columns={'Classificacao_IF': 'Instituição Financeira', 'Ano_Safra': 'Ano Safra'})
-    df[['UF', 'Instituição Financeira', 'Ano Safra']] = df[['UF', 'Instituição Financeira', 'Ano Safra']].astype('category')
-    df[['Mes_Emissao', 'Ano_Emissao']] = df[['Mes_Emissao', 'Ano_Emissao']].astype(int)
+    if 'Classificacao_IF' in df.columns:
+        df = df.rename(columns={'Classificacao_IF': 'Instituição Financeira'})
+    if 'Ano_Safra' in df.columns:
+        df = df.rename(columns={'Ano_Safra': 'Ano Safra'})
     return df
 
-# --- Uso ---
 df = load_data()
+
 if df.empty:
     st.error("Nenhum dado foi carregado.")
     st.stop()
 
-st.success(f"{len(df)} linhas carregadas de {len(df.columns)} colunas.")
+st.success(f"{len(df)} linhas carregadas.")
+
+# Teste simples: mostrar apenas preview
 st.write(df.head())
