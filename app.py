@@ -1,143 +1,47 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 
-# --- Configuração da Página ---
-st.set_page_config(page_title="Dashboard Crédito Rural", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="Teste leitura Parquet", page_icon="📂", layout="wide")
+st.title("📂 Teste de leitura dos arquivos Parquet (raw GitHub)")
 
-@st.cache_data
-def load_data():
-    base_url = "https://raw.githubusercontent.com/jpmelo-tech/acompanhamento-safra/main/"
-    arquivos = [
-        f"matriz_de_dados_credito_rural_{ano}.parquet"
-        for ano in [
-            "2015-2016","2016-2017","2017-2018","2018-2019","2019-2020",
-            "2020-2021","2021-2022","2022-2023","2023-2024","2024-2025","2025-2026"
-        ]
-    ]
-    
-    lista_dfs = []
-    for arq in arquivos:
-        url = base_url + arq
+# Lista de anos e construção dos caminhos raw
+base_url = "https://raw.githubusercontent.com/jpmelo-tech/acompanhamento-safra/main/"
+anos = [
+    "2015-2016","2016-2017","2017-2018","2018-2019","2019-2020",
+    "2020-2021","2021-2022","2022-2023","2023-2024","2024-2025","2025-2026"
+]
+arquivos = [f"matriz_de_dados_credito_rural_{ano}.parquet" for ano in anos]
+
+st.write("Iniciando leitura de arquivos...")
+
+resultados = []
+for i, arq in enumerate(arquivos, start=1):
+    url = base_url + arq
+    with st.spinner(f"Lendo {arq} ({i}/{len(arquivos)})..."):
         try:
             df_temp = pd.read_parquet(url)
-            lista_dfs.append(df_temp)
+            resultados.append({
+                "arquivo": arq,
+                "linhas": len(df_temp),
+                "colunas": len(df_temp.columns),
+                "ok": True
+            })
         except Exception as e:
-            # Apenas log no console, sem st.warning
-            print(f"Erro ao ler {arq}: {e}")
+            resultados.append({
+                "arquivo": arq,
+                "linhas": None,
+                "colunas": None,
+                "ok": False,
+                "erro": str(e)
+            })
 
-    if not lista_dfs:
-        return pd.DataFrame()
-
-    df = pd.concat(lista_dfs, ignore_index=True)
-
-    # Renomeação e Tipagem
-    if 'Classificacao_IF' in df.columns:
-        df = df.rename(columns={'Classificacao_IF': 'Instituição Financeira'})
-    if 'Ano_Safra' in df.columns:
-        df = df.rename(columns={'Ano_Safra': 'Ano Safra'})
-    for col in ['UF', 'Instituição Financeira', 'Ano Safra']:
-        if col in df.columns:
-            df[col] = df[col].astype('category')
-    for col in ['Mes_Emissao', 'Ano_Emissao']:
-        if col in df.columns:
-            df[col] = df[col].astype(int)
-
-    return df
-
-# --- Carregamento dos dados ---
-df = load_data()
-if df.empty:
-    st.error("Nenhum dado foi carregado.")
-    st.stop()
-
-# --- Configurações de Variáveis ---
-valores_cols = ['Valor_Custeio', 'Valor_Investimento', 'Valor_Comercializacao', 'Valor_Industrializacao']
-anos_safra = sorted(df['Ano Safra'].unique().tolist())
-
-# --- Sidebar ---
-st.sidebar.header("🔍 Filtros Estratégicos")
-tema = st.sidebar.radio("Tema Visual", ["Claro", "Dark"])
-inst_sel = st.sidebar.multiselect("Instituições", sorted(df['Instituição Financeira'].unique()))
-safra_sel = st.sidebar.multiselect("Safras", anos_safra, default=[anos_safra[-1]])
-
-# --- CSS e Tema ---
-if tema == "Dark":
-    bg_color, text_color, card_color, plotly_template = "#0E1117", "#FFFFFF", "#262730", "plotly_dark"
-else:
-    bg_color, text_color, card_color, plotly_template = "#FFFFFF", "#000000", "#F0F2F6", "plotly_white"
-
-st.markdown(f"""
-    <style>
-    .stApp {{ background-color: {bg_color}; color: {text_color}; }}
-    [data-testid="stSidebar"] {{ background-color: {card_color}; }}
-    h1, h2, h3, h5, p {{ color: {text_color} !important; }}
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- Cabeçalho ---
-st.title("🌱 Inteligência do Crédito Rural")
-st.markdown("##### Fonte: Banco Central do Brasil")
-
-# --- Lógica de Meses da Safra ---
-ordem_safra = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
-nomes_meses = {7:"Jul", 8:"Ago", 9:"Set", 10:"Out", 11:"Nov", 12:"Dez", 1:"Jan", 2:"Fev", 3:"Mar", 4:"Abr", 5:"Mai", 6:"Jun"}
-
-mes_inicio_nome, mes_fim_nome = st.sidebar.select_slider(
-    "Intervalo de meses (Safra)",
-    options=[nomes_meses[m] for m in ordem_safra],
-    value=("Jul", "Jun")
+# Tabela de resultados
+st.subheader("Resumo da leitura por arquivo")
+st.dataframe(
+    pd.DataFrame(resultados),
+    use_container_width=True
 )
 
-mes_inicio = [k for k, v in nomes_meses.items() if v == mes_inicio_nome][0]
-mes_fim = [k for k, v in nomes_meses.items() if v == mes_fim_nome][0]
-idx_i, idx_f = ordem_safra.index(mes_inicio), ordem_safra.index(mes_fim)
-meses_validos = ordem_safra[idx_i : idx_f + 1] if idx_i <= idx_f else ordem_safra[idx_i:] + ordem_safra[:idx_f + 1]
-
-st.info(f"📅 Safra: **{mes_inicio_nome}** até **{mes_fim_nome}**")
-st.divider()
-
-# --- Filtros de Dados ---
-df_f = df[df['Mes_Emissao'].isin(meses_validos)].copy()
-if safra_sel: df_f = df_f[df_f['Ano Safra'].isin(safra_sel)]
-if inst_sel: df_f = df_f[df_f['Instituição Financeira'].isin(inst_sel)]
-
-# --- Visualizações ---
-if not df_f.empty:
-    # 1. Gráfico de Evolução
-    st.subheader("📈 Evolução Mensal")
-    evol_data = df_f.groupby(['Instituição Financeira', 'Ano Safra', 'Mes_Emissao'], observed=True)[valores_cols].sum().sum(axis=1).reset_index(name='Total')
-    evol_data['Total_BI'] = evol_data['Total'] / 1e9
-
-    fig_line = px.line(
-        evol_data, x='Mes_Emissao', y='Total_BI', color='Instituição Financeira',
-        facet_col='Ano Safra', markers=True,
-        category_orders={"Mes_Emissao": ordem_safra},
-        template=plotly_template
-    )
-    st.plotly_chart(fig_line, use_container_width=True, key="chart_line_prod")
-
-    # 2. Relatório de Finalidade
-    st.subheader("📋 Detalhamento por Safra")
-    
-    rel_bruto = df_f.groupby(['Ano Safra', 'Instituição Financeira'], observed=True)[valores_cols].sum()
-    rel_bruto['Total'] = rel_bruto.sum(axis=1)
-    rel_pct = (rel_bruto.div(rel_bruto.groupby(level=0).sum(), level=0) * 100)
-    rel_pct.columns = [c + " (%)" for c in rel_pct.columns]
-    
-    df_final = pd.concat([rel_bruto / 1e9, rel_pct], axis=1).reset_index()
-
-    for i, safra in enumerate(sorted(df_final['Ano Safra'].unique(), reverse=True)):
-        st.markdown(f"#### 🗓️ Safra {safra}")
-        df_safra = df_final[df_final['Ano Safra'] == safra].sort_values(by='Total', ascending=False)
-
-        col_configs = {
-            "Ano Safra": None,
-            "Total": st.column_config.NumberColumn("Total", format="R$ %.2f BI"),
-            "Total (%)": st.column_config.ProgressColumn("MS (%)", format="%.2f%%", min_value=0, max_value=100)
-        }
-        
-        st.dataframe(df_safra, column_config=col_configs, use_container_width=True, hide_index=True, key=f"tbl_{safra}_{i}")
-        st.divider()
-else:
-    st.warning("Nenhum dado encontrado para os filtros atuais.")
+# Mensagem final
+total_ok = sum(r["ok"] for r in resultados)
+st.success(f"Arquivos lidos com sucesso: {total_ok}/{len(resultados)}")
