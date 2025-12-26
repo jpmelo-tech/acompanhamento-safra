@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
-st.set_page_config(page_title="Teste Filtros", page_icon="🧩", layout="wide")
-st.title("🧩 Teste com filtros básicos (sem tipagem)")
+st.set_page_config(page_title="Dashboard Teste", page_icon="🌱", layout="wide")
+st.title("🌱 Teste com filtros e gráfico (sem st.dataframe)")
 
 # --- Leitura e concatenação ---
 base_url = "https://raw.githubusercontent.com/jpmelo-tech/acompanhamento-safra/main/"
@@ -31,7 +32,19 @@ if safra_sel:
 if inst_sel:
     df_f = df_f[df_f['Instituição Financeira'].isin(inst_sel)]
 
-# --- Resultado ---
+# --- Resultado filtrado ---
 st.success(f"DataFrame filtrado: {len(df_f)} linhas, {len(df_f.columns)} colunas")
-st.subheader("Preview filtrado")
-st.dataframe(df_f.head(50), use_container_width=True, key="preview_filtros")
+st.subheader("Preview filtrado (via st.write)")
+st.write(df_f.head(20))   # usamos st.write em vez de st.dataframe
+
+# --- Gráfico simples ---
+if not df_f.empty:
+    st.subheader("📈 Evolução Mensal (teste)")
+    valores_cols = ['Valor_Custeio','Valor_Investimento','Valor_Comercializacao','Valor_Industrializacao']
+    evol_data = df_f.groupby(['Ano Safra','Mes_Emissao'])[valores_cols].sum().sum(axis=1).reset_index(name='Total')
+    evol_data['Total_BI'] = evol_data['Total'] / 1e9
+
+    fig = px.line(evol_data, x='Mes_Emissao', y='Total_BI', color='Ano Safra', markers=True)
+    st.plotly_chart(fig, use_container_width=True, key="grafico_teste")
+else:
+    st.warning("Nenhum dado encontrado para os filtros atuais.")
